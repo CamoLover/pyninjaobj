@@ -1,59 +1,32 @@
-# pyninjaobj
-A simple Python script which takes Ninjaripper model dumps and converts them into an obj
+# pyninjaobj (Fork)
 
+A Python GUI Tool to Convert NinjaRip-2 .rip Files to .obj
 
-## Requirements
-The script should only require Python 3, and even then would be trivial to move to support Python 2.
+## Introduction
+This repository is a fork of the original [theFroh/pyninjaobj](https://github.com/theFroh/pyninjaobj) project by Luke Gaynor (theFroh). The pyninjaobj script is a GUI-based tool that takes NinjaRip-2 model dumps (`.rip` files) and converts them into Wavefront OBJ files (`.obj`). The forked version of pyninjaobj has made some improvements and updates to the original project.
+
+## Features
+- Converts NinjaRip-2 .rip files into .obj format through a user-friendly graphical interface.
+- Supports both single `.rip` file conversion and batch conversion of `.rip` files in a directory.
+- Outputs a separate .mtl (Material Template Library) file for material definitions.
+- Allows the selection of the export format (currently supports .obj).
 
 ## Usage
-Assuming Python has been installed, you can invoke this script with the following in a command line/terminal:
+1. Launch the application.
+2. Select the processing mode - either "File" for single file conversion or "Directory" for batch conversion.
+3. Click the "Browse" button to select the `.rip` file or directory containing `.rip` files.
+4. Select the export format (currently supports .obj).
+5. Click the "Convert" button to initiate the conversion.
 
-  `python pyninjaobj.py [path to folder containing .rip files]`
+The resulting `.obj` and accompanying `.mtl` files will be created in the specified output directory. You can import the `.obj` into your favorite 3D editor for inspection, editing, and export.
 
-If Python has been associated with `.py` files, you can also just drag and drop a `rip` folder onto the script to run it.
+## Known Limitations
+- NinjaRip-2 may not preserve mesh object names, resulting in generic component names.
+- NinjaRip-2 may not handle certain model details correctly, especially in mods, affecting positioning and rotation.
+- The script does not differentiate between multiple textures on a single mesh component.
+- It imports all textures, including non-diffuse ones like emissive and specular maps, which may need manual cleanup.
 
-An `.obj` and accompanying `.mtl` file should be created inside of the `rip` folder. You can import the `.obj` into your favourite 3D editor to inspect/edit/export it.
+## Original Author
+The original pyninjaobj script was created by Luke Gaynor. This forked version aims to maintain and improve the tool's functionality. You can find the original project at [theFroh/pyninjaobj](https://github.com/theFroh/pyninjaobj).
 
-## Usage for Dawn of War rips
-A lot of you guys will be using this for converting rips from Dawn of War, so to help give users having trouble a little help, I've included a Windows `.bat` file; ``dow_rip.bat``.
-
-All the batch file does is run the script as follows:
-
-    python pyninjaobj.py --tga --exists [drag and dropped folder]
-
-This means **it expects that the textures you wish to use are in `.tga` format, and that they exist**. Any textures that aren't there or aren't in the `.tga` format will be ignored completely.
-
-To convert a typical rip from Dawn of War's army painter:
-
-1. Use IrfanView (See below) or Photoshop or GIMP to convert *only* the `.dds` textures which are normal colour (diffuse texture maps). Usually these have names which end in `_1`, but its safer to check by eye.
-2. Drag and drop the rip folder onto `dow_rip.bat`.
-3. Import the `convert.obj` into Blender, fix weird rotations and positions, you're done!
-
-#### Example of step one using IrfanView:
-![IrfanView Thumbnails](https://i.imgur.com/2hkioEx.png)
-*By drag and dropping the rip folder onto IrfanView, I can see all the textures at once. I've selected only the colour diffuse maps here. Note the similar looking other texture maps -- we just want the diffuse ones.*
-
-![IrfanView Batch Conversion](https://i.imgur.com/QCGKLCu.png)
-*By right clicking and selecting "Start batch dialog with selected files..." I'm shown this window. The important things to note is the Output Format and clicking "Use current (look in)`directory"*
-
-## Arguments
-    usage: pyninjaobj.py [-h] [--tga] [--exists] rip_path
-
-    Converts NinjaRipper .rips into .objs
-
-    positional arguments:
-      rip_path      path to the folder containing rip files
-
-    optional arguments:
-      -h, --help    show this help message and exit
-      --tga         look for tga textures
-      --exists, -e  only include materials for which their texture files exist
-
-## Notes *on things I have no control over*
-NinjaRipper can't know any mesh object names, hence the bland naming of components. Sorry.
-
-In Dawn of War's army painter, many models (especially those in mods) have details added in a way that mess up positioning and rotation in Ninjaripper. This isn't the scripts fault, you'll just have to fix them yourself in Blender. Sorry.
-
-Neither can it differentiate between multiple textures on a single mesh component. Also sorry.
-
-Additionally, it will import **all** a ripped model's textures, which can include non-diffuse ones such as emissive and specular maps -- you will have to clear these out yourself. *Sorry.*
+Please report any issues or contribute to the development of this forked project. Thank you for using pyninjaobj!

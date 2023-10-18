@@ -20,33 +20,31 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import tkinter as tk
+from tkinter import filedialog
+from tkinter import ttk
+from tkinter import Text
+
+
 from collections import namedtuple
-from pprint import pprint
 import struct
 import array
+import os
 
-HEADER = """# Converted with PyNinjaObj '.rip' to '.obj' converter"""
+HEADER = """# Converted with NinjaRip-2 Converter"""
+
 DEFAULT_MAT = """Ka 0.000000 0.000000 0.000000\nKd 0.376320 0.376320 0.376320\nKs 0.000000 0.000000 0.000000"""
 
 class Vector3():
-    """A 3D point"""
     def __init__(self, x, y, z):
         self.x = x
         self.y = y
         self.z = z
 
-    def __repr__(self):
-        return "({},{},{})".format(self.x, self.y, self.z)
-
 class Vector2():
-    """A 2D point"""
     def __init__(self, u, v):
         self.u = u
         self.v = v
-
-    def __repr__(self):
-        return "({},{})".format(self.u, self.v)
-
 
 def read_str(filehandle):
     buf = b''
@@ -60,9 +58,9 @@ def read_str(filehandle):
 
 class RipMesh():
     def __init__(self, ripfile):
-        v_idx = Vector3(0,0,0)
-        vn_idx = Vector3(0,0,0)
-        vt_idx = Vector2(0,0)
+        v_idx = Vector3(0, 0, 0)
+        vn_idx = Vector3(0, 0, 0)
+        vt_idx = Vector2(0, 0)
 
         rip = open(ripfile, "rb")
 
@@ -78,10 +76,8 @@ class RipMesh():
         shader_file_count = info_header[6]
         vertex_attribute_count = info_header[7]
 
-        print(version,face_count,vertex_count,vertex_size,texture_file_count,shader_file_count,vertex_attribute_count)
-
         if signature != 0xDEADC0DE:
-            raise NotImplementedError("Sorry, this file signature isn't recognised.")
+            raise NotImplementedError("Sorry, this file signature isn't recognized.")
 
         if version != 4:
             print("Warning: This tool was written for version 4 .rip files, not version", version)
@@ -94,7 +90,6 @@ class RipMesh():
 
         for i in range(0, vertex_attribute_count):
             attrib_type = read_str(rip)
-            # print("oo",attrib_type,"<ye")
 
             attrib_info = array.array("L")
             attrib_info.fromfile(rip, 4)
@@ -109,31 +104,26 @@ class RipMesh():
 
             vertex_attrib_types.extend(vertex_attrib)
 
-            # print(pos_idx, normal_idx, uv_idx, vertex_attrib)
             if attrib_type == "POSITION" and pos_idx == 0:
                 v_idx.x = attrib_offset // 4
                 v_idx.y = v_idx.x + 1
                 v_idx.z = v_idx.x + 2
-                # print("adding pos", v_idx)
                 pos_idx += 1
 
             elif attrib_type == "NORMAL" and normal_idx == 0:
                 vn_idx.x = attrib_offset // 4
                 vn_idx.y = vn_idx.x + 1
                 vn_idx.z = vn_idx.x + 2
-                # print("adding norm", vn_idx)
                 normal_idx += 1
 
             elif attrib_type == "TEXCOORD" and uv_idx == 0:
                 vt_idx.u = attrib_offset // 4
                 vt_idx.v = vt_idx.u + 1
-                # print("adding uv", vt_idx)
                 uv_idx += 1
 
         self.texture_files = []
         for i in range(0, texture_file_count):
             self.texture_files.append(read_str(rip))
-        print(self.texture_files)
 
         self.shader_files = []
         for i in range(0, shader_file_count):
@@ -150,14 +140,13 @@ class RipMesh():
         self.texcoords = []
 
         for i in range(0, vertex_count):
-            v = Vector3(0,0,0)
-            vn = Vector3(0,0,0)
-            vt = Vector2(0,0)
+            v = Vector3(0, 0, 0)
+            vn = Vector3(0, 0, 0)
+            vt = Vector2(0, 0)
 
-            for j,element_type in enumerate(vertex_attrib_types):
+            for j, element_type in enumerate(vertex_attrib_types):
                 pos = 0
-                # print(rip.tell())
-                # print(element_type)
+
                 if element_type == 0:
                     pos, = struct.unpack("f", rip.read(struct.calcsize("f")))
                 elif element_type == 1:
@@ -179,7 +168,6 @@ class RipMesh():
                     vn.z = pos
                 elif j == vt_idx.u:
                     vt.u = pos
-                    # print(vt)
                 elif j == vt_idx.v:
                     vt.v = 1 - pos
 
@@ -187,118 +175,158 @@ class RipMesh():
             self.normals.append(vn)
             self.texcoords.append(vt)
 
-        print("Finished reading mesh file")
         rip.close()
 
-def riptoobj(ripfiles, outdir, tga=False, name="convert", exists=False):
+def riptoobj(ripfiles, outdir, export_format, exists=False):
     meshes = []
     for ripfile in ripfiles:
         meshes.append(RipMesh(ripfile))
 
-    print("Making OBJ and MTL files")
-    objname = outdir + name + ".obj"
-    mtlname = outdir + name + ".mtl"
+        if export_format == "obj":
+            objname = os.path.join(outdir, os.path.splitext(ripfile)[0] + ".obj")
+            mtlname = os.path.join(outdir, os.path.splitext(ripfile)[0] + ".mtl")
 
-    texset = set()
-    for mesh in meshes:
-        for tex in mesh.texture_files:
-            if tga:
-                tex = tex[:-4] + ".tga" # .dds to .tga
+            texset = set()
+            for mesh in meshes:
+                for tex in mesh.texture_files:
+                    texset.add(tex)
 
-            if exists and not os.path.isfile(os.path.join(outdir, tex)):
-                # print("Ignoring nonexistant", tex)
-                continue
-            texset.add(tex)
+            objlines = []
+            mtllines = []
 
-    pprint(texset)
+            objlines.append(HEADER)
+            if len(texset) > 0:
+                objlines.append("mtllib " + mtlname)
+                mtllines.append(HEADER)
 
-    objlines = []
-    mtllines = []
+                for tex in texset:
+                    mtllines.append("newmtl " + tex)
+                    mtllines.append(DEFAULT_MAT)
+                    mtllines.append("map_Kd " + tex)
+                    mtllines.append("")
 
-    objlines.append(HEADER)
-    if len(texset) > 0:
-        # only need to make an mtl if theres textures
-        objlines.append("mtllib " + mtlname)
-        mtllines.append(HEADER)
+                last_idx = None
 
-        for tex in texset:
-            mtllines.append("newmtl " + tex)
-            mtllines.append(DEFAULT_MAT)
-            mtllines.append("map_Kd " + tex)
-            mtllines.append("")
+                for idx, mesh in enumerate(meshes):
+                    objlines.append("o Object" + str(idx))
+                    for tex in mesh.texture_files:
+                        objlines.append("usemtl " + tex)
 
-        last_idx = None
+                    for v in mesh.vertices:
+                        objlines.append("v {} {} {}".format(v.x, v.y, v.z))
 
-        for idx,mesh in enumerate(meshes):
-            objlines.append("o Object" + str(idx))
-            for tex in mesh.texture_files:
-                if tga:
-                    tex = tex[:-4] + ".tga"
+                    for vn in mesh.normals:
+                        objlines.append("vn {} {} {}".format(vn.x, vn.y, vn.z))
 
-                if exists and not os.path.isfile(os.path.join(outdir, tex)):
-                    continue # ignore nonexistant materials if specified
-                objlines.append("usemtl " + tex)
+                    for vt in mesh.texcoords:
+                        objlines.append("vt {} {}".format(vt.u, vt.v))
 
-            for v in mesh.vertices:
-                objlines.append("v {} {} {}".format(v.x, v.y, v.z))
+                    if not last_idx:
+                        last_idx = 1
 
-            for vn in mesh.normals:
-                objlines.append("vn {} {} {}".format(vn.x, vn.y, vn.z))
+                    highest_idx = 0
+                    for face in mesh.faces:
+                        line = ["f"]
 
-            for vt in mesh.texcoords:
-                objlines.append("vt {} {}".format(vt.u, vt.v))
+                        for v in face:
+                            v += last_idx
+                            highest_idx = v if v > highest_idx else highest_idx
+                            line.append("{}/{}/{}".format(v, v, v))
+                        objlines.append(" ".join(line))
 
-            if not last_idx:
-                last_idx = 1
+                    last_idx = highest_idx + 1
+                with open(objname, "w") as obj:
+                    obj.write("\n".join(objlines))
 
-            highest_idx = 0
-            for face in mesh.faces:
-                line = ["f"]
+                with open(mtlname, "w") as mtl:
+                    mtl.write("\n".join(mtllines))
 
-                for v in face:
-                    v += last_idx
-                    highest_idx = v if v > highest_idx else highest_idx
-                    line.append("{}/{}/{}".format(v,v,v))
-                objlines.append(" ".join(line))
 
-            last_idx = highest_idx+1
-            # print(len(mesh.faces), len(mesh.vertices), last_idx)
 
-    with open(objname, "w") as obj:
-        obj.write("\n".join(objlines))
+class NinjaRipConverter:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("NinjaRip-2 Converter")
 
-    with open(mtlname, "w") as mtl:
-        mtl.write("\n".join(mtllines))
+        self.file_path = tk.StringVar()
+        self.export_format = tk.StringVar()
+        self.export_format.set("obj")
+        self.process_option = tk.StringVar()
+        self.process_option.set("file")
 
-    # for tex in mesh.texture_files:
-    #     if tga:
-    #         tex = tex[:-4] + ".tga"
+        self.create_widgets()
 
-    # print(vertices)
-    # print(normals)
-    # print(uvs)
+    def create_widgets(self):
+        process_label = ttk.Label(self.root, text="Process:")
+        process_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+
+        file_radio = ttk.Radiobutton(self.root, text="File", variable=self.process_option, value="file")
+        file_radio.grid(row=0, column=1, padx=10, pady=10, sticky="w")
+
+        dir_radio = ttk.Radiobutton(self.root, text="Directory", variable=self.process_option, value="dir")
+        dir_radio.grid(row=0, column=2, padx=10, pady=10, sticky="w")
+
+        file_label = ttk.Label(self.root, text="Select .rip file or directory:")
+        file_label.grid(row=1, column=0, padx=10, pady=10, sticky="w")
+
+        self.file_entry = ttk.Entry(self.root, textvariable=self.file_path)
+        self.file_entry.grid(row=1, column=1, padx=10, pady=10, columnspan=2, sticky="we")
+
+        browse_button = ttk.Button(self.root, text="Browse", command=self.browse_file_or_directory)
+        browse_button.grid(row=1, column=3, padx=10, pady=10, sticky="w")
+
+        export_label = ttk.Label(self.root, text="Select export format:")
+        export_label.grid(row=2, column=0, padx=10, pady=10, sticky="w")
+
+        obj_radio = ttk.Radiobutton(self.root, text="OBJ", variable=self.export_format, value="obj")
+        obj_radio.grid(row=2, column=1, padx=10, pady=10, sticky="w")
+
+        convert_button = ttk.Button(self.root, text="Convert", command=self.convert_rip)
+        convert_button.grid(row=3, column=0, padx=10, pady=10, columnspan=4, sticky="we")
+
+        self.command_output_text = Text(self.root, height=10, width=40)
+        self.command_output_text.grid(row=4, column=0, padx=10, pady=10, columnspan=4, sticky="we")
+
+    def browse_file_or_directory(self):
+        if self.process_option.get() == "file":
+            file_path = filedialog.askopenfilename(filetypes=[("RIP files", "*.rip")])
+        else:
+            file_path = filedialog.askdirectory()
+        self.file_path.set(file_path)
+
+    def convert_rip(self):
+        file_path = self.file_path.get()
+        export_format = self.export_format.get()
+        outdir = os.path.dirname(file_path)
+
+        if not file_path:
+            self.command_output_text.delete(1.0, tk.END)
+            self.command_output_text.insert(tk.END, "Please select a .rip file or directory.")
+            return
+
+        try:
+            if self.process_option.get() == "file":
+                riptoobj([file_path], outdir, export_format)
+                self.command_output_text.delete(1.0, tk.END)
+                self.command_output_text.insert(tk.END, f"Conversion successful. Output saved in {outdir}.")
+            else:
+                if os.path.isdir(file_path):
+                    ripfiles = [os.path.join(file_path, f) for f in os.listdir(file_path) if f.endswith(".rip")]
+                    if ripfiles:
+                        riptoobj(ripfiles, outdir, export_format)
+                        self.command_output_text.delete(1.0, tk.END)
+                        self.command_output_text.insert(tk.END, f"Conversion successful. Output saved in {outdir}.")
+                    else:
+                        self.command_output_text.delete(1.0, tk.END)
+                        self.command_output_text.insert(tk.END, "No .rip files found in the selected directory.")
+                else:
+                    self.command_output_text.delete(1.0, tk.END)
+                    self.command_output_text.insert(tk.END, "Selected directory is not valid.")
+        except Exception as e:
+            self.command_output_text.delete(1.0, tk.END)
+            self.command_output_text.insert(tk.END, f"Conversion failed: {str(e)}")
+
 if __name__ == '__main__':
-    import argparse
-    import os
-
-    parser = argparse.ArgumentParser(description="Converts NinjaRipper .rips into .objs")
-    parser.add_argument("rip_path", help="path to the folder containing rip files")
-
-    # parser.add_argument("-o","--output", nargs=1, help="output path and name (not including)")
-    parser.add_argument("--tga", help="look for tga textures", action='store_true')
-    parser.add_argument("--exists", "-e", help="only include materials for which their texture files exist", action='store_true')
-    # parser.add_argument("--whitelist_suffix", "-w", help="only include material's with these suffixes", nargs="+")
-
-    args = parser.parse_args()
-
-    indir = os.path.normpath(args.rip_path)
-    out = args.rip_path+os.path.sep
-
-    print("Saving to", os.path.realpath(out))
-
-    paths = []
-    for f in os.listdir(indir):
-        if f.endswith(".rip"):
-            paths.append(indir+os.path.sep+f)
-
-    riptoobj(paths, out, tga=args.tga, exists=args.exists)
+    root = tk.Tk()
+    app = NinjaRipConverter(root)
+    root.mainloop()
